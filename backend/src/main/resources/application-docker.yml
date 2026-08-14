@@ -1,0 +1,13 @@
+spring:
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://postgres:5432/expense_intelligence}
+    username: ${SPRING_DATASOURCE_USERNAME:expense_user}
+    password: ${SPRING_DATASOURCE_PASSWORD:expense_pass}
+
+app:
+  jwt:
+    secret: ${JWT_SECRET:change-me-in-production-use-at-least-256-bit-secret-key}
+
+logging:
+  level:
+    com.expenseintelligence: INFO
