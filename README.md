@@ -1,6 +1,6 @@
 # Expense Intelligence Platform
 
-AI-powered financial intelligence platform for importing expenses from multiple sources and generating intelligent spending insights.
+AI-powered financial intelligence platform for importing expenses from multiple sources — including automated Gmail ingestion and CSV import — and generating intelligent spending insights.
 
 > **ChatGPT + Personal Finance + Analytics**
 

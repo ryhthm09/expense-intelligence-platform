@@ -51,16 +51,16 @@
 | M1 — Secure Foundation | 101–103 | 0/3 | ⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜ 0% |
 | M2 — Categories & Transactions | 201–303 | 0/5 | ⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜ 0% |
 | M3 — Merchants & Budgets | 401–502 | 0/4 | ⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜ 0% |
-| M4 — CSV Import | 601–605 | 0/5 | ⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜ 0% |
+| M4 — Data Ingestion (CSV + Gmail) | 601–609 | 0/9 | ⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜ 0% |
 | M5 — Analytics | 701–705 | 0/5 | ⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜ 0% |
 | M6 — AI & Intelligence | 801–804 | 0/4 | ⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜ 0% |
 | M7 — Production Readiness | 901–904 | 0/4 | ⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜ 0% |
 
-**Total: 0 / 30 tickets complete**
+**Total: 0 / 34 tickets complete**
 
 ---
 
-## Suggested Schedule (8-week pace)
+## Suggested Schedule (10-week pace)
 
 | Week | Focus | Tickets |
 |------|-------|---------|
@@ -68,12 +68,14 @@
 | 2 | Categories | EIP-201, 202 |
 | 3 | Transactions | EIP-301, 302, 303 |
 | 4 | Merchants & Budgets | EIP-401, 402, 501 |
-| 5 | Budgets + Import start | EIP-502, 601, 602 |
-| 6 | Import pipeline | EIP-603, 604, 605 |
-| 7 | Analytics | EIP-701, 702, 703, 704, 705 |
-| 8 | AI + Production | EIP-801, 802, 803, 901, 904 |
+| 5 | Budgets + Ingestion start | EIP-502, 601, 602 |
+| 6 | CSV import pipeline | EIP-603, 604, 605 |
+| 7 | Gmail OAuth + discovery | EIP-606, 607 |
+| 8 | Gmail extraction + sync | EIP-608, 609 |
+| 9 | Analytics | EIP-701, 702, 703, 704, 705 |
+| 10 | AI + Production | EIP-801, 802, 803, 901, 904 |
 
-Weeks 9–10 (optional): EIP-804, 902, 903
+Weeks 11–12 (optional): EIP-804, 902, 903
 
 ---
 
@@ -151,32 +153,54 @@ Weeks 9–10 (optional): EIP-804, 902, 903
 
 ---
 
-### Milestone 4 — CSV Import Pipeline
+### Milestone 4 — Data Ingestion (CSV + Gmail)
+
+> **Architecture note:** Gmail and CSV are separate *acquisition* paths. Both feed the same `ParsedTransaction` → `TransactionIngestionService` pipeline. See [ARCHITECTURE.md](./ARCHITECTURE.md#ingestion-architecture-target-state).
 
 - [ ] **EIP-601** · ImportJob Entity & Migration  
   🌙 Evening · Prereq: EIP-103, 301  
   **Goal:** Flyway V2, `ImportJob` entity + repository  
-  **Key deliverable:** `ImportStatus` enum
+  **Key deliverable:** `ImportStatus` enum; job `source` field (`CSV`, `GMAIL`) for shared sync/import tracking
 
-- [ ] **EIP-602** · Bank Format Strategy & Generic CSV Parser  
+- [ ] **EIP-602** · Bank Format Strategy, Generic CSV Parser & Ingestion Interfaces  
   🏖️ Weekend · Prereq: EIP-601  
-  **Goal:** `BankFormatParser` interface + `GenericCsvParser`  
-  **Key deliverable:** `BankFormatDetector`, CSV test fixtures
+  **Goal:** `BankFormatParser` interface + `GenericCsvParser` + source-agnostic `ParsedTransaction` DTO  
+  **Key deliverable:** `BankFormatDetector`, CSV test fixtures; ingestion interfaces that Gmail will reuse in EIP-608/609
 
 - [ ] **EIP-603** · Bank-Specific Parsers (Chase, BofA, Wells Fargo)  
   🏖️ Weekend · Prereq: EIP-602  
   **Goal:** Three real bank parsers  
   **Key deliverable:** Anonymized CSV fixtures in `src/test/resources/csv/`
 
-- [ ] **EIP-604** · CSV Upload Endpoint & Duplicate Detection  
+- [ ] **EIP-604** · CSV Upload & Shared Transaction Ingestion Service  
   🏖️ Weekend · Prereq: EIP-602, 603, 601, 402  
-  **Goal:** `POST /api/v1/imports/csv` + job status APIs  
-  **Key deliverable:** Dedup via `(userId, externalId)`
+  **Goal:** `POST /api/v1/imports/csv` + `TransactionIngestionService` (normalize → dedupe → persist)  
+  **Key deliverable:** Dedup via `(userId, externalId)`; **Gmail path must reuse this service — do not duplicate transaction creation**
 
-- [ ] **EIP-605** · Merchant Auto-Extraction on Import  
+- [ ] **EIP-605** · Merchant Auto-Extraction on CSV Import  
   🌙 Evening · Prereq: EIP-604, 402  
-  **Goal:** Auto-link merchants during import  
+  **Goal:** Auto-link merchants during CSV import  
   **Key deliverable:** `merchantsCreated` count in job summary
+
+- [ ] **EIP-606** · Gmail OAuth Integration & Connection Management  
+  🏖️ Weekend · Prereq: EIP-601, 101  
+  **Goal:** Google OAuth 2.0 consent flow; `GmailConnection` entity; connect/disconnect/re-auth  
+  **Key deliverable:** Least-privilege Gmail scopes; encrypted token storage; **separate from EIP JWT login**
+
+- [ ] **EIP-607** · Gmail Financial Email Discovery  
+  🏖️ Weekend · Prereq: EIP-606  
+  **Goal:** Gmail API message listing/search to identify potentially financial emails  
+  **Key deliverable:** Discovery separated from extraction; no blind full-mailbox download
+
+- [ ] **EIP-608** · Gmail Transaction Extraction  
+  🏖️ Weekend · Prereq: EIP-607, 602  
+  **Goal:** Extract merchant, amount, currency, date, external ref from financial emails  
+  **Key deliverable:** Extensible extraction strategies; output `ParsedTransaction` for shared pipeline
+
+- [ ] **EIP-609** · Gmail Sync, Idempotency & Incremental Processing  
+  🏖️ Weekend · Prereq: EIP-608, 604, 606  
+  **Goal:** Background initial + incremental sync; dedup via Gmail `messageId` as `external_id`  
+  **Key deliverable:** Job-based processing (not synchronous HTTP); retry/failure handling; sync status tracking
 
 ---
 
@@ -286,4 +310,4 @@ Anything uncertain: [optional]
 
 ---
 
-*Last updated: 2026-08-06 · Phase 1 scaffold complete, backend implementation not started*
+*Last updated: 2026-08-16 · Phase 1 scaffold complete; Gmail ingestion added to M4 planning*
